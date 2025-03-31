@@ -1,11 +1,5 @@
-
-
-
-
-
-
-
-export REGION="${ZONE%-*}"
+#Task - 1 :
+export REGION="us-east4"
 
 gcloud compute networks create griffin-dev-vpc --subnet-mode custom
 
@@ -15,21 +9,18 @@ gcloud compute networks subnets create griffin-dev-mgmt --network=griffin-dev-vp
 
 #Task - 2 :
 
-gsutil cp -r gs://cloud-training/gsp321/dm .
+gcloud compute networks create griffin-prod-vpc --subnet-mode custom
 
-cd dm
+gcloud compute networks subnets create griffin-prod-wp --network=griffin-prod-vpc --region $REGION --range=192.168.48.0/20
 
-sed -i s/SET_REGION/$REGION/g prod-network.yaml
-
-gcloud deployment-manager deployments create prod-network \
-    --config=prod-network.yaml
-
-cd ..
+gcloud compute networks subnets create griffin-prod-mgmt --network=griffin-prod-vpc --region $REGION --range=192.168.64.0/20
 
 
 #Task - 3 : 
 
-gcloud compute instances create bastion --network-interface=network=griffin-dev-vpc,subnet=griffin-dev-mgmt  --network-interface=network=griffin-prod-vpc,subnet=griffin-prod-mgmt --tags=ssh --zone=$ZONE
+export ZONE="us-east4-b"
+
+gcloud compute instances create bastion --network-interface=network=griffin-dev-vpc,subnet=griffin-dev-mgmt  --network-interface=network=griffin-prod-vpc,subnet=griffin-prod-mgmt --tags=ssh --zone=$ZONE --machine-type=e2-medium
 
 gcloud compute firewall-rules create fw-ssh-dev --source-ranges=0.0.0.0/0 --target-tags ssh --allow=tcp:22 --network=griffin-dev-vpc
 
@@ -37,22 +28,19 @@ gcloud compute firewall-rules create fw-ssh-prod --source-ranges=0.0.0.0/0 --tar
 
 
 #Task - 4 : 
-
-
-
 gcloud sql instances create griffin-dev-db \
-    --database-version=MYSQL_5_7 \
+    --database-version=MYSQL_8_0 \
     --region=$REGION \
-    --root-password='quicklab'
+    --root-password='!@QWaszx12'
+	
+gcloud sql connect griffin-dev-db --user=root --quiet
 
+CREATE DATABASE wordpress;
+CREATE USER "wp_user"@"%" IDENTIFIED BY "stormwind_rules";
+GRANT ALL PRIVILEGES ON wordpress.* TO "wp_user"@"%";
+FLUSH PRIVILEGES;
 
-
-gcloud sql databases create wordpress --instance=griffin-dev-db
-
-gcloud sql users create wp_user --instance=griffin-dev-db --password=stormwind_rules --instance=griffin-dev-db
-gcloud sql users set-password wp_user --instance=griffin-dev-db --password=stormwind_rules --instance=griffin-dev-db
-gcloud sql users list --instance=griffin-dev-db --format="value(name)" --filter="host='%'" --instance=griffin-dev-db
-
+exit
 
 #Task - 5 :
 
@@ -66,13 +54,9 @@ gcloud container clusters create griffin-dev \
 
 gcloud container clusters get-credentials griffin-dev --zone $ZONE
 
-cd ~/
-
-gsutil cp -r gs://cloud-training/gsp321/wp-k8s .
-
-
 #Task - 6 : 
-
+cd ~/
+gsutil cp -r gs://cloud-training/gsp321/wp-k8s .
 
 cat > wp-k8s/wp-env.yaml <<EOF_END
 kind: PersistentVolumeClaim
@@ -105,8 +89,7 @@ gcloud iam service-accounts keys create key.json \
     --iam-account=cloud-sql-proxy@$GOOGLE_CLOUD_PROJECT.iam.gserviceaccount.com
 kubectl create secret generic cloudsql-instance-credentials \
     --from-file key.json
-
-
+	
 #Task - 7 : 
 
 INSTANCE_ID=$(gcloud sql instances describe griffin-dev-db --format='value(connectionName)')
@@ -175,77 +158,38 @@ spec:
 
 EOF_END
 
-
 kubectl create -f wp-deployment.yaml
 kubectl create -f wp-service.yaml
 
+#Task - 8 : 
 
-
-# Get the IAM policy JSON
-IAM_POLICY_JSON=$(gcloud projects get-iam-policy $DEVSHELL_PROJECT_ID --format=json)
-
-# Extract user emails with 'roles/viewer' role
-USERS=$(echo $IAM_POLICY_JSON | jq -r '.bindings[] | select(.role == "roles/viewer").members[]')
-
-# Grant 'roles/editor' role to extracted users
-for USER in $USERS; do
-  if [[ $USER == *"user:"* ]]; then
-    USER_EMAIL=$(echo $USER | cut -d':' -f2)
-    gcloud projects add-iam-policy-binding $DEVSHELL_PROJECT_ID \
-      --member=user:$USER_EMAIL \
-      --role=roles/editor
-  fi
-done
-
-
-sleep 60
-
-
-# Store the external IP address in a variable
 EXTERNAL_IP=$(kubectl get services wordpress -o=jsonpath='{.status.loadBalancer.ingress[0].ip}')
+	gcloud compute instances list
+
+    gcloud monitoring uptime-check create wordpress_uc \
+      --ip-address $EXTERNAL_IP \
+      --check-interval 60s \
+      --protocol HTTP \
+      --resource-type public_ip
+	  
+	gcloud monitoring uptime create wordpress_uc \
+      --ip-address $EXTERNAL_IP \
+      --check-interval 60s \
+      --protocol http \
+      --resource-type uptime-url
+	
+
+#task - 9 :
+
+sudo apt -y install jq
+
+echo "export USERID2="Username2"" >> ~/.bashrc
+
+gcloud config list project
+
+echo "export PROJECTID2="qwiklabs-gcp-03-7adee6343238"" >> ~/.bashrc
+
+. ~/.bashrc
+gcloud projects add-iam-policy-binding $PROJECTID --member user:$USERID2 --role=roles/editor
 
 
-cat > terraform.tfvars <<EOF_END
-devsell_project_id = "$DEVSHELL_PROJECT_ID"
-external_ip        = "$EXTERNAL_IP"
-
-EOF_END
-
-
-cat > quicklab.tf << "EOF_END"
-variable "devsell_project_id" {
-  description = "The project ID"
-}
-
-variable "external_ip" {
-  description = "The external IP address"
-}
-
-provider "google" {
-  project = var.devsell_project_id
-}
-
-resource "google_monitoring_uptime_check_config" "example" {
-  display_name = "quicklab"
-  timeout      = "60s"
-
-  http_check {
-    port           = "80"
-    request_method = "GET"
-  }
-
-  monitored_resource {
-    type = "uptime_url"
-    labels = {
-      project_id = var.devsell_project_id
-      host       = var.external_ip  # Replace with your external IP
-    }
-  }
-
-  checker_type = "STATIC_IP_CHECKERS"
-}
-
-EOF_END
-
-terraform init
-terraform apply --auto-approve
