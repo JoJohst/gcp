@@ -187,7 +187,7 @@ echo "export USERID2="Username2"" >> ~/.bashrc
 
 gcloud config list project
 
-echo "export PROJECTID2="qwiklabs-gcp-03-7adee6343238"" >> ~/.bashrc
+echo "export PROJECTID="qwiklabs-gcp-03-7adee6343238"" >> ~/.bashrc
 
 . ~/.bashrc
 gcloud projects add-iam-policy-binding $PROJECTID --member user:$USERID2 --role=roles/editor
