@@ -1,5 +1,6 @@
 #Task - 1 :
 export REGION="us-east4"
+export ZONE="us-east4-b"
 
 gcloud compute networks create griffin-dev-vpc --subnet-mode custom
 
@@ -18,7 +19,6 @@ gcloud compute networks subnets create griffin-prod-mgmt --network=griffin-prod-
 
 #Task - 3 : 
 
-export ZONE="us-east4-b"
 
 gcloud compute instances create bastion --network-interface=network=griffin-dev-vpc,subnet=griffin-dev-mgmt  --network-interface=network=griffin-prod-vpc,subnet=griffin-prod-mgmt --tags=ssh --zone=$ZONE --machine-type=e2-medium
 
