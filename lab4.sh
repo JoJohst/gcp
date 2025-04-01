@@ -162,19 +162,23 @@ kubectl create -f wp-deployment.yaml
 kubectl create -f wp-service.yaml
 
 #Task - 8 : 
+CLUSTER_NAME="griffin-dev"
+CLUSTER_ZONE=$ZONE
+NAMESPACE="default"
+SERVICE_NAME="wordpress"
+ 
+EXTERNAL_IP=$(kubectl get service "$SERVICE_NAME" -n "$NAMESPACE" -o jsonpath='{.status.loadBalancer.ingress[0].ip}' --context="gke_${PROJECT_ID}_${CLUSTER_ZONE}_${CLUSTER_NAME}")
+ 
+gcloud monitoring uptime create \
+  --display-name="wordpressuc" \
+  --path="/" \
+  --port=80 \
+  --resource-type=uptime-url \
+  --resource-labels=host=$EXTERNAL_IP \
+  --period="1" \
+  --timeout="10" \
+  --project="$PROJECT_ID"
 
-EXTERNAL_IP=$(kubectl get services wordpress -o=jsonpath='{.status.loadBalancer.ingress[0].ip}')
-
-gcloud monitoring uptime create "wordpressuc" \
-	--resource-type=uptime-url \
-	--protocol=http \
-	--host=$EXTERNAL_IP \
-	--path=/ \
-	--port=80 \
-	--period=60s \
-	--timeout=10 \
-	--status-codes=200 \
-	--user-labels=environment=production
 	
 
 #task - 9 :
