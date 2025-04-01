@@ -166,11 +166,11 @@ CLUSTER_NAME="griffin-dev"
 CLUSTER_ZONE=$ZONE
 NAMESPACE="default"
 SERVICE_NAME="wordpress"
+PROJECT_ID="qwiklabs-gcp-01-77a45cb2e226" 
  
 EXTERNAL_IP=$(kubectl get service "$SERVICE_NAME" -n "$NAMESPACE" -o jsonpath='{.status.loadBalancer.ingress[0].ip}' --context="gke_${PROJECT_ID}_${CLUSTER_ZONE}_${CLUSTER_NAME}")
  
-gcloud monitoring uptime create \
-  --display-name="wordpressuc" \
+gcloud monitoring uptime create "wordpressuc" \
   --path="/" \
   --port=80 \
   --resource-type=uptime-url \
@@ -178,7 +178,6 @@ gcloud monitoring uptime create \
   --period="1" \
   --timeout="10" \
   --project="$PROJECT_ID"
-
 	
 
 #task - 9 :
