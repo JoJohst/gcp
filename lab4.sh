@@ -164,19 +164,17 @@ kubectl create -f wp-service.yaml
 #Task - 8 : 
 
 EXTERNAL_IP=$(kubectl get services wordpress -o=jsonpath='{.status.loadBalancer.ingress[0].ip}')
-	gcloud compute instances list
 
-    gcloud monitoring uptime-check create wordpress_uc \
-      --ip-address $EXTERNAL_IP \
-      --check-interval 60s \
-      --protocol HTTP \
-      --resource-type public_ip
-	  
-	gcloud monitoring uptime create wordpress_uc \
-      --ip-address $EXTERNAL_IP \
-      --check-interval 60s \
-      --protocol http \
-      --resource-type uptime-url
+gcloud monitoring uptime create "wordpressuc" \
+	--resource-type=uptime-url \
+	--protocol=http \
+	--host=$EXTERNAL_IP \
+	--path=/ \
+	--port=80 \
+	--period=60s \
+	--timeout=10 \
+	--status-codes=200 \
+	--user-labels=environment=production
 	
 
 #task - 9 :
